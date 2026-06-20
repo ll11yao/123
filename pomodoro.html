@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🍅 Pomodoro Timer</title>
+<style>
+/* ===== CSS Variables / Themes ===== */
+:root {
+  --bg: #0f172a;
+  --card-bg: #1e293b;
+  --card-border: #334155;
+  --text: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --track-color: #334155;
+  --hover-bg: #334155;
+  --btn-bg: #334155;
+  --btn-text: #f1f5f9;
+  --btn-hover: #475569;
+  --input-bg: #0f172a;
+  --input-border: #475569;
+  --shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+  --work-color: #ef4444;
+  --shortbreak-color: #22c55e;
+  --longbreak-color: #3b82f6;
+  --ring-size: 280px;
+  --transition-speed: 0.3s;
+}
+
+[data-theme="light"] {
+  --bg: #f8fafc;
+  --card-bg: #ffffff;
+  --card-border: #e2e8f0;
+  --text: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --track-color: #e2e8f0;
+  --hover-bg: #f1f5f9;
+  --btn-bg: #f1f5f9;
+  --btn-text: #0f172a;
+  --btn-hover: #e2e8f0;
+  --input-bg: #ffffff;
+  --input-border: #cbd5e1;
+  --shadow: 0 25px 50px -12px rgba(0,0,0,0.15);
+}
+
+/* ===== Reset & Base ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei",
+               "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition-speed), color var(--transition-speed);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ===== App Container ===== */
+.app {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 24px;
+  padding: 40px 36px 32px;
+  max-width: 420px;
+  width: 100%;
+  box-shadow: var(--shadow);
+  transition: background var(--transition-speed), border-color var(--transition-speed), box-shadow var(--transition-speed);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+/* ===== SVG Ring ===== */
+.ring-container {
+  position: relative;
+  width: var(--ring-size);
+  height: var(--ring-size);
+}
+
+.ring-container svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.timer-ring-bg {
+  fill: none;
+  stroke: var(--track-color);
+  stroke-width: 8;
+  transition: stroke var(--transition-speed);
+}
+
+.timer-ring-progress {
+  fill: none;
+  stroke: var(--work-color);
+  stroke-width: 8;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1s linear, stroke var(--transition-speed);
+}
+
+.timer-ring-progress.work { stroke: var(--work-color); }
+.timer-ring-progress.shortBreak { stroke: var(--shortbreak-color); }
+.timer-ring-progress.longBreak { stroke: var(--longbreak-color); }
+
+/* ===== Timer Display (centered in ring) ===== */
+.timer-display {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.time-text {
+  font-size: 56px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -2px;
+  color: var(--text);
+  transition: color var(--transition-speed);
+  line-height: 1;
+}
+
+.session-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  transition: color var(--transition-speed);
+}
+
+/* ===== Controls ===== */
+.controls {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.btn {
+  border: none;
+  border-radius: 12px;
+  padding: 12px 28px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn:active { transform: scale(0.96); }
+
+.btn-primary {
+  background: var(--work-color);
+  color: #fff;
+  min-width: 130px;
+  justify-content: center;
+}
+.btn-primary:hover { filter: brightness(1.1); }
+.btn-primary.shortBreak { background: var(--shortbreak-color); }
+.btn-primary.longBreak { background: var(--longbreak-color); }
+
+.btn-secondary {
+  background: var(--btn-bg);
+  color: var(--btn-text);
+}
+.btn-secondary:hover { background: var(--btn-hover); }
+
+/* ===== Session Counter ===== */
+.session-counter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.pomodoro-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.pomodoro-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--track-color);
+  transition: all 0.4s ease;
+}
+
+.pomodoro-dot.completed {
+  background: var(--work-color);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+}
+
+.counter-text {
+  font-size: 13px;
+  color: var(--text-muted);
+  transition: color var(--transition-speed);
+}
+
+/* ===== Settings ===== */
+.settings-panel {
+  width: 100%;
+}
+
+.settings-panel details {
+  border-top: 1px solid var(--card-border);
+  padding-top: 16px;
+  transition: border-color var(--transition-speed);
+}
+
+.settings-panel summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color var(--transition-speed);
+}
+.settings-panel summary:hover { color: var(--text); }
+.settings-panel summary::marker { display: none; }
+.settings-panel summary::-webkit-details-marker { display: none; }
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.setting-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.setting-row.full-width {
+  grid-column: 1 / -1;
+}
+
+.setting-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: color var(--transition-speed);
+}
+
+.setting-input {
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+  color: var(--text);
+  font-family: inherit;
+  transition: all var(--transition-speed);
+  width: 100%;
+}
+.setting-input:focus {
+  outline: none;
+  border-color: var(--work-color);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+}
+
+.setting-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+}
+
+.toggle-switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: var(--track-color);
+  border-radius: 24px;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  left: 3px;
+  bottom: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.3s;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background: var(--work-color);
+}
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(20px);
+}
+
+.setting-actions {
+  display: flex;
+  gap: 8px;
+  grid-column: 1 / -1;
+  margin-top: 4px;
+}
+
+.btn-small {
+  padding: 6px 14px;
+  font-size: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--card-border);
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+.btn-small:hover { background: var(--btn-hover); }
+
+/* ===== Status Bar ===== */
+.status-bar {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  min-height: 18px;
+  transition: color var(--transition-speed);
+}
+
+/* ===== Animations ===== */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.timer-finished .time-text {
+  animation: pulse 1s ease-in-out infinite;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 460px) {
+  .app {
+    padding: 28px 20px 24px;
+    border-radius: 20px;
+    gap: 20px;
+  }
+  :root { --ring-size: 240px; }
+  .time-text { font-size: 44px; }
+  .settings-grid { grid-template-columns: 1fr; }
+}
+
+/* ===== Popup mode adjustments ===== */
+body.popup-mode {
+  background: var(--card-bg);
+}
+body.popup-mode .app {
+  box-shadow: none;
+  border: none;
+  border-radius: 0;
+  padding: 20px;
+  max-width: 100%;
+}
+</style>
+</head>
+<body data-theme="dark">
+<div class="app" id="app">
+
+  <!-- Timer Ring -->
+  <div class="ring-container" id="ringContainer">
+    <svg viewBox="0 0 200 200">
+      <circle class="timer-ring-bg" cx="100" cy="100" r="90"/>
+      <circle class="timer-ring-progress work" id="progressArc" cx="100" cy="100" r="90"
+              stroke-dasharray="565.4867" stroke-dashoffset="0"/>
+    </svg>
+    <div class="timer-display">
+      <span class="time-text" id="timeText">25:00</span>
+      <span class="session-label" id="sessionLabel">工作</span>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button class="btn btn-primary work" id="btnStartPause" title="Space">
+      <span id="btnIcon">▶</span>
+      <span id="btnText">开始</span>
+    </button>
+    <button class="btn btn-secondary" id="btnReset" title="R">
+      <span>↺</span> 重置
+    </button>
+  </div>
+
+  <!-- Session Counter -->
+  <div class="session-counter">
+    <div class="pomodoro-dots" id="pomodoroDots"></div>
+    <span class="counter-text" id="counterText">0 个番茄</span>
+  </div>
+
+  <!-- Settings -->
+  <div class="settings-panel">
+    <details id="settingsDetails">
+      <summary>⚙️ 设置</summary>
+      <div class="settings-grid">
+        <div class="setting-row">
+          <label class="setting-label">工作时长 (分)</label>
+          <input class="setting-input" type="number" id="workDuration" min="1" max="120" value="25">
+        </div>
+        <div class="setting-row">
+          <label class="setting-label">短休息 (分)</label>
+          <input class="setting-input" type="number" id="shortBreakDuration" min="1" max="60" value="5">
+        </div>
+        <div class="setting-row">
+          <label class="setting-label">长休息 (分)</label>
+          <input class="setting-input" type="number" id="longBreakDuration" min="1" max="60" value="15">
+        </div>
+        <div class="setting-row">
+          <label class="setting-label">长休息间隔</label>
+          <input class="setting-input" type="number" id="longBreakInterval" min="1" max="10" value="4">
+        </div>
+        <div class="setting-row">
+          <label class="setting-toggle">
+            <span class="setting-label">声音提醒</span>
+            <span class="toggle-switch">
+              <input type="checkbox" id="soundEnabled" checked>
+              <span class="toggle-slider"></span>
+            </span>
+          </label>
+        </div>
+        <div class="setting-row">
+          <label class="setting-toggle">
+            <span class="setting-label">桌面通知</span>
+            <span class="toggle-switch">
+              <input type="checkbox" id="notificationsEnabled" checked>
+              <span class="toggle-slider"></span>
+            </span>
+          </label>
+        </div>
+        <div class="setting-row">
+          <label class="setting-toggle">
+            <span class="setting-label">深色模式</span>
+            <span class="toggle-switch">
+              <input type="checkbox" id="darkModeToggle" checked>
+              <span class="toggle-slider"></span>
+            </span>
+          </label>
+        </div>
+        <div class="setting-actions">
+          <button class="btn-small" id="btnPopup">📌 弹出窗口</button>
+          <button class="btn-small" id="btnPiP">🖼️ 画中画</button>
+        </div>
+      </div>
+    </details>
+  </div>
+
+  <!-- Status -->
+  <div class="status-bar" id="statusBar">准备开始</div>
+
+</div>
+
+<script>
+// ============================================================
+// Pomodoro Timer — State & Engine
+// ============================================================
+
+const CIRCUMFERENCE = 2 * Math.PI * 90; // ~565.4867
+
+// -- Default settings --
+const DEFAULT_SETTINGS = {
+  workDuration: 25,
+  shortBreakDuration: 5,
+  longBreakDuration: 15,
+  longBreakInterval: 4,
+  soundEnabled: true,
+  notificationsEnabled: true,
+  darkMode: true,
+};
+
+// -- Session labels --
+const SESSION_LABELS = {
+  work:       { zh: '工作',   en: 'Work' },
+  shortBreak: { zh: '短休息', en: 'Short Break' },
+  longBreak:  { zh: '长休息', en: 'Long Break' },
+};
+
+// -- Central state --
+const state = {
+  // Timer
+  timerStatus: 'idle',          // idle | running | paused | finished
+  currentSession: 'work',       // work | shortBreak | longBreak
+  targetEndTime: null,          // Date.now() timestamp (null when idle/paused/finished)
+  pausedRemaining: null,        // seconds remaining at pause
+  totalDuration: 25 * 60,       // seconds
+
+  // Session tracking
+  completedPomodoros: 0,
+  sessionsInCycle: 0,           // work sessions since last long break
+
+  // Settings (loaded from localStorage)
+  settings: { ...DEFAULT_SETTINGS },
+};
+
+// ============================================================
+// Settings Persistence
+// ============================================================
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem('pomodoro-settings');
+    if (raw) {
+      const saved = JSON.parse(raw);
+      return { ...DEFAULT_SETTINGS, ...saved };
+    }
+  } catch (e) { /* ignore */ }
+  return { ...DEFAULT_SETTINGS };
+}
+
+function saveSettings() {
+  localStorage.setItem('pomodoro-settings', JSON.stringify(state.settings));
+}
+
+function loadTodayPomodoros() {
+  const today = new Date().toISOString().slice(0, 10);
+  try {
+    const raw = localStorage.getItem('pomodoro-sessions');
+    const data = raw ? JSON.parse(raw) : {};
+    return data[today] || 0;
+  } catch (e) { return 0; }
+}
+
+function incrementTodayPomodoros() {
+  const today = new Date().toISOString().slice(0, 10);
+  try {
+    const raw = localStorage.getItem('pomodoro-sessions');
+    const data = raw ? JSON.parse(raw) : {};
+    data[today] = (data[today] || 0) + 1;
+    localStorage.setItem('pomodoro-sessions', JSON.stringify(data));
+  } catch (e) { /* ignore */ }
+}
+
+// ============================================================
+// Sound Synthesis (Web Audio API)
+// ============================================================
+
+let audioCtx = null;
+
+function getAudioContext() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  // Resume if suspended (browser autoplay policy)
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function playChime(frequency, startTime, duration, volume = 0.25) {
+  const ctx = getAudioContext();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = frequency;
+  gain.gain.setValueAtTime(0, startTime);
+  gain.gain.linearRampToValueAtTime(volume, startTime + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(startTime);
+  osc.stop(startTime + duration);
+}
+
+function playWorkCompleteSound() {
+  if (!state.settings.soundEnabled) return;
+  try {
+    const ctx = getAudioContext();
+    const now = ctx.currentTime;
+    const notes = [523.25, 659.25, 783.99]; // C5, E5, G5
+    notes.forEach((freq, i) => playChime(freq, now + i * 0.22, 0.5, 0.3));
+  } catch (e) { /* audio not available */ }
+}
+
+function playBreakCompleteSound() {
+  if (!state.settings.soundEnabled) return;
+  try {
+    const ctx = getAudioContext();
+    const now = ctx.currentTime;
+    const notes = [783.99, 659.25]; // G5, E5
+    notes.forEach((freq, i) => playChime(freq, now + i * 0.22, 0.45, 0.25));
+  } catch (e) { /* audio not available */ }
+}
+
+// ============================================================
+// Desktop Notifications
+// ============================================================
+
+function requestNotificationPermission() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+}
+
+function sendNotification(title, body) {
+  if (!state.settings.notificationsEnabled) return;
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'granted') {
+    new Notification(title, { body, silent: true, requireInteraction: true });
+  }
+}
+
+// ============================================================
+// Timer Session Flow
+// ============================================================
+
+function getSessionDuration(sessionType) {
+  switch (sessionType) {
+    case 'work':       return state.settings.workDuration * 60;
+    case 'shortBreak': return state.settings.shortBreakDuration * 60;
+    case 'longBreak':  return state.settings.longBreakDuration * 60;
+    default:           return 25 * 60;
+  }
+}
+
+function getNextSession() {
+  if (state.currentSession === 'work') {
+    state.sessionsInCycle++;
+    if (state.sessionsInCycle >= state.settings.longBreakInterval) {
+      state.sessionsInCycle = 0;
+      return 'longBreak';
+    }
+    return 'shortBreak';
+  }
+  // After any break, go back to work
+  return 'work';
+}
+
+function handleTimerComplete() {
+  state.timerStatus = 'finished';
+  state.targetEndTime = null;
+  state.pausedRemaining = null;
+
+  const wasWork = state.currentSession === 'work';
+
+  if (wasWork) {
+    state.completedPomodoros++;
+    incrementTodayPomodoros();
+    playWorkCompleteSound();
+    sendNotification('🍅 时间到！', '专注结束，休息一下吧。');
+    updateStatus('工作完成！准备休息...');
+  } else {
+    playBreakCompleteSound();
+    sendNotification('☕ 休息结束', '休息结束，开始专注工作！');
+    updateStatus('休息结束！准备专注...');
+  }
+
+  // Auto-advance to next session after a short delay
+  clearTimeout(state._autoAdvanceTimeout);
+  state._autoAdvanceTimeout = setTimeout(() => {
+    const next = getNextSession();
+    state.currentSession = next;
+    state.totalDuration = getSessionDuration(next);
+    state.timerStatus = 'running';
+    state.targetEndTime = Date.now() + state.totalDuration * 1000;
+    updateStatus(next === 'work' ? '工作中...' : '休息中...');
+    render();
+    requestAnimationFrame(tick);
+  }, 2500);
+}
+
+// ============================================================
+// Timer Engine (Wall-Clock via Date.now() + rAF)
+// ============================================================
+
+let rafId = null;
+
+function tick() {
+  if (state.timerStatus !== 'running') {
+    rafId = null;
+    return;
+  }
+
+  const remainingMs = Math.max(0, state.targetEndTime - Date.now());
+  const remainingSec = remainingMs / 1000;
+  const fraction = state.totalDuration > 0 ? remainingSec / state.totalDuration : 0;
+
+  updateTimerDisplay(remainingSec, fraction);
+  updateTitle(remainingSec);
+
+  if (remainingMs <= 0) {
+    rafId = null;
+    handleTimerComplete();
+  } else {
+    rafId = requestAnimationFrame(tick);
+  }
+}
+
+function startTimer() {
+  // Seed audio context on user gesture
+  if (state.settings.soundEnabled) {
+    try { getAudioContext(); } catch (e) { /* ignore */ }
+  }
+  requestNotificationPermission();
+
+  if (state.timerStatus === 'paused') {
+    // Resume from pause
+    state.targetEndTime = Date.now() + state.pausedRemaining * 1000;
+    state.pausedRemaining = null;
+  } else {
+    // Fresh start
+    state.totalDuration = getSessionDuration(state.currentSession);
+    state.targetEndTime = Date.now() + state.totalDuration * 1000;
+  }
+
+  state.timerStatus = 'running';
+  updateStatus(state.currentSession === 'work' ? '工作中...' : '休息中...');
+  render();
+  rafId = requestAnimationFrame(tick);
+}
+
+function pauseTimer() {
+  state.pausedRemaining = Math.max(0, (state.targetEndTime - Date.now()) / 1000);
+  state.targetEndTime = null;
+  state.timerStatus = 'paused';
+  if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+  updateStatus('已暂停');
+  render();
+}
+
+function resetTimer() {
+  if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+  clearTimeout(state._autoAdvanceTimeout);
+  state.timerStatus = 'idle';
+  state.targetEndTime = null;
+  state.pausedRemaining = null;
+  state.currentSession = 'work';
+  state.sessionsInCycle = 0;
+  state.totalDuration = state.settings.workDuration * 60;
+  updateStatus('准备开始');
+  render();
+  updateTitle(null);
+}
+
+function skipSession() {
+  if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+  clearTimeout(state._autoAdvanceTimeout);
+  const next = getNextSession();
+  if (state.currentSession === 'work') {
+    state.completedPomodoros++;
+    incrementTodayPomodoros();
+  }
+  state.currentSession = next;
+  state.totalDuration = getSessionDuration(next);
+  state.timerStatus = 'running';
+  state.targetEndTime = Date.now() + state.totalDuration * 1000;
+  updateStatus(next === 'work' ? '工作中...' : '休息中...');
+  render();
+  rafId = requestAnimationFrame(tick);
+}
+
+// Tab visibility — catch up when returning
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && state.timerStatus === 'running' && state.targetEndTime) {
+    const remainingSec = Math.max(0, (state.targetEndTime - Date.now()) / 1000);
+    const fraction = state.totalDuration > 0 ? remainingSec / state.totalDuration : 0;
+    updateTimerDisplay(remainingSec, fraction);
+    updateTitle(remainingSec);
+    if (!rafId) rafId = requestAnimationFrame(tick);
+  }
+});
+
+// ============================================================
+// DOM References
+// ============================================================
+
+const $ = (sel) => document.querySelector(sel);
+
+const dom = {
+  app:             $('#app'),
+  body:            document.body,
+  progressArc:     $('#progressArc'),
+  timeText:        $('#timeText'),
+  sessionLabel:    $('#sessionLabel'),
+  btnStartPause:   $('#btnStartPause'),
+  btnIcon:         $('#btnIcon'),
+  btnText:         $('#btnText'),
+  btnReset:        $('#btnReset'),
+  pomodoroDots:    $('#pomodoroDots'),
+  counterText:     $('#counterText'),
+  statusBar:       $('#statusBar'),
+  ringContainer:   $('#ringContainer'),
+  settingsDetails: $('#settingsDetails'),
+};
+
+// ============================================================
+// Render
+// ============================================================
+
+function updateTimerDisplay(remainingSec, fraction) {
+  const mins = Math.floor(remainingSec / 60);
+  const secs = Math.floor(remainingSec % 60);
+  dom.timeText.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+  // SVG progress: dashoffset goes from 0 (full, time=total) to CIRCUMFERENCE (empty, time=0)
+  const offset = CIRCUMFERENCE * (1 - fraction);
+  dom.progressArc.style.strokeDashoffset = offset;
+}
+
+function updateTitle(remainingSec) {
+  if (remainingSec == null) {
+    document.title = '🍅 Pomodoro Timer';
+    return;
+  }
+  const mins = Math.floor(remainingSec / 60);
+  const secs = Math.floor(remainingSec % 60);
+  const time = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  const label = state.currentSession === 'work' ? '工作' : '休息';
+  document.title = `${time} - ${label} | Pomodoro`;
+}
+
+function updateStatus(msg) {
+  dom.statusBar.textContent = msg;
+}
+
+function render() {
+  const { timerStatus, currentSession, totalDuration, completedPomodoros, sessionsInCycle, settings } = state;
+
+  // -- Session label --
+  dom.sessionLabel.textContent = SESSION_LABELS[currentSession].zh;
+
+  // -- Timer display --
+  if (timerStatus === 'idle') {
+    const mins = Math.floor(totalDuration / 60);
+    const secs = totalDuration % 60;
+    dom.timeText.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    dom.progressArc.style.strokeDashoffset = '0';
+    dom.ringContainer.classList.remove('timer-finished');
+    updateTitle(null);
+  } else if (timerStatus === 'paused') {
+    const sec = state.pausedRemaining || totalDuration;
+    const mins = Math.floor(sec / 60);
+    const secs = Math.floor(sec % 60);
+    dom.timeText.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    const fraction = sec / totalDuration;
+    dom.progressArc.style.strokeDashoffset = CIRCUMFERENCE * (1 - fraction);
+    dom.ringContainer.classList.remove('timer-finished');
+    updateTitle(sec);
+  } else if (timerStatus === 'finished') {
+    dom.timeText.textContent = '00:00';
+    dom.progressArc.style.strokeDashoffset = CIRCUMFERENCE;
+    dom.ringContainer.classList.add('timer-finished');
+    updateTitle(0);
+  }
+
+  // -- Progress arc color --
+  dom.progressArc.classList.remove('work', 'shortBreak', 'longBreak');
+  dom.progressArc.classList.add(currentSession);
+
+  // -- Buttons --
+  const primaryBtn = dom.btnStartPause;
+  primaryBtn.classList.remove('work', 'shortBreak', 'longBreak');
+  primaryBtn.classList.add(currentSession);
+
+  if (timerStatus === 'running') {
+    dom.btnIcon.textContent = '⏸';
+    dom.btnText.textContent = '暂停';
+  } else if (timerStatus === 'paused' || timerStatus === 'finished') {
+    dom.btnIcon.textContent = '▶';
+    dom.btnText.textContent = '继续';
+  } else {
+    dom.btnIcon.textContent = '▶';
+    dom.btnText.textContent = '开始';
+  }
+
+  // -- Pomodoro dots --
+  const maxDots = settings.longBreakInterval;
+  let dotsHTML = '';
+  for (let i = 0; i < maxDots; i++) {
+    dotsHTML += `<span class="pomodoro-dot${i < sessionsInCycle ? ' completed' : ''}"></span>`;
+  }
+  dom.pomodoroDots.innerHTML = dotsHTML;
+
+  // -- Counter text --
+  const today = loadTodayPomodoros();
+  dom.counterText.textContent = `${today} 个番茄`;
+
+  // -- Settings inputs (keep in sync when state changes externally) --
+  if (document.activeElement !== $('#workDuration') &&
+      document.activeElement !== $('#shortBreakDuration') &&
+      document.activeElement !== $('#longBreakDuration') &&
+      document.activeElement !== $('#longBreakInterval')) {
+    $('#workDuration').value = settings.workDuration;
+    $('#shortBreakDuration').value = settings.shortBreakDuration;
+    $('#longBreakDuration').value = settings.longBreakDuration;
+    $('#longBreakInterval').value = settings.longBreakInterval;
+  }
+  $('#soundEnabled').checked = settings.soundEnabled;
+  $('#notificationsEnabled').checked = settings.notificationsEnabled;
+  $('#darkModeToggle').checked = settings.darkMode;
+}
+
+// ============================================================
+// Event Handlers
+// ============================================================
+
+dom.btnStartPause.addEventListener('click', () => {
+  if (state.timerStatus === 'running') {
+    pauseTimer();
+  } else {
+    startTimer();
+  }
+});
+
+dom.btnReset.addEventListener('click', () => {
+  resetTimer();
+});
+
+// Settings change handlers
+$('#workDuration').addEventListener('change', function () {
+  state.settings.workDuration = Math.max(1, Math.min(120, parseInt(this.value) || 25));
+  this.value = state.settings.workDuration;
+  if (state.timerStatus === 'idle' && state.currentSession === 'work') {
+    state.totalDuration = state.settings.workDuration * 60;
+  }
+  saveSettings();
+  render();
+});
+
+$('#shortBreakDuration').addEventListener('change', function () {
+  state.settings.shortBreakDuration = Math.max(1, Math.min(60, parseInt(this.value) || 5));
+  this.value = state.settings.shortBreakDuration;
+  saveSettings();
+  render();
+});
+
+$('#longBreakDuration').addEventListener('change', function () {
+  state.settings.longBreakDuration = Math.max(1, Math.min(60, parseInt(this.value) || 15));
+  this.value = state.settings.longBreakDuration;
+  saveSettings();
+  render();
+});
+
+$('#longBreakInterval').addEventListener('change', function () {
+  state.settings.longBreakInterval = Math.max(1, Math.min(10, parseInt(this.value) || 4));
+  this.value = state.settings.longBreakInterval;
+  saveSettings();
+  render();
+});
+
+$('#soundEnabled').addEventListener('change', function () {
+  state.settings.soundEnabled = this.checked;
+  saveSettings();
+});
+
+$('#notificationsEnabled').addEventListener('change', function () {
+  state.settings.notificationsEnabled = this.checked;
+  if (this.checked) requestNotificationPermission();
+  saveSettings();
+});
+
+$('#darkModeToggle').addEventListener('change', function () {
+  state.settings.darkMode = this.checked;
+  document.body.setAttribute('data-theme', this.checked ? 'dark' : 'light');
+  saveSettings();
+});
+
+// Popup window
+$('#btnPopup').addEventListener('click', () => {
+  const url = window.location.href;
+  const w = 400, h = 620;
+  const left = (screen.width - w) / 2;
+  const top = (screen.height - h) / 2;
+  window.open(url, 'pomodoro-popup',
+    `width=${w},height=${h},left=${left},top=${top},resizable=no,menubar=no,toolbar=no,status=no`);
+});
+
+// Picture-in-Picture
+$('#btnPiP').addEventListener('click', async () => {
+  if (!('documentPictureInPicture' in window)) {
+    updateStatus('画中画需要 Chrome 116+ 浏览器');
+    return;
+  }
+  try {
+    // Close existing PiP window if open
+    if (window._pipWindow) { window._pipWindow.close(); window._pipWindow = null; }
+    const pipWin = await documentPictureInPicture.requestWindow({
+      width: 280, height: 320,
+    });
+    window._pipWindow = pipWin;
+    // Copy styles and ring container into PiP window
+    const styles = document.querySelector('style').cloneNode(true);
+    pipWin.document.head.appendChild(styles);
+    pipWin.document.body.setAttribute('data-theme', state.settings.darkMode ? 'dark' : 'light');
+    pipWin.document.body.classList.add('popup-mode');
+
+    const clone = dom.ringContainer.cloneNode(true);
+    clone.style.setProperty('--ring-size', '200px');
+    // Update the cloned timer display
+    const clonedTime = clone.querySelector('.timer-display');
+    // Create controls in PiP
+    const controlsDiv = document.createElement('div');
+    controlsDiv.className = 'controls';
+    controlsDiv.style.cssText = 'display:flex;gap:8px;justify-content:center;margin-top:16px;';
+    controlsDiv.innerHTML = `
+      <button class="btn btn-primary ${state.currentSession}" id="pipPlayPause" style="min-width:90px;padding:8px 16px;font-size:14px;">
+        ${state.timerStatus === 'running' ? '⏸ 暂停' : '▶ 开始'}
+      </button>
+    `;
+
+    const appDiv = document.createElement('div');
+    appDiv.className = 'app';
+    appDiv.appendChild(clone);
+    appDiv.appendChild(controlsDiv);
+    pipWin.document.body.appendChild(appDiv);
+
+    // Wire PiP button
+    pipWin.document.getElementById('pipPlayPause').addEventListener('click', () => {
+      if (state.timerStatus === 'running') pauseTimer(); else startTimer();
+      syncPiP(pipWin);
+    });
+
+    // Sync function
+    function syncPiP(win) {
+      const t = win.document.querySelector('.time-text');
+      const l = win.document.querySelector('.session-label');
+      const b = win.document.getElementById('pipPlayPause');
+      const a = win.document.querySelector('.timer-ring-progress');
+      if (t) t.textContent = dom.timeText.textContent;
+      if (l) l.textContent = dom.sessionLabel.textContent;
+      if (b) {
+        b.textContent = state.timerStatus === 'running' ? '⏸ 暂停' : '▶ 开始';
+        b.className = `btn btn-primary ${state.currentSession}`;
+      }
+      if (a) {
+        a.style.strokeDashoffset = dom.progressArc.style.strokeDashoffset;
+        a.classList.remove('work', 'shortBreak', 'longBreak');
+        a.classList.add(state.currentSession);
+      }
+    }
+
+    // Sync periodically
+    const syncInterval = setInterval(() => {
+      if (pipWin.closed) { clearInterval(syncInterval); return; }
+      syncPiP(pipWin);
+    }, 500);
+
+    pipWin.addEventListener('pagehide', () => { clearInterval(syncInterval); });
+    updateStatus('画中画窗口已打开');
+  } catch (e) {
+    updateStatus('画中画打开失败');
+  }
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  // Ignore when typing in inputs
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (state.timerStatus === 'running') {
+      pauseTimer();
+    } else {
+      startTimer();
+    }
+  } else if (e.code === 'KeyR') {
+    e.preventDefault();
+    resetTimer();
+  } else if (e.code === 'KeyS' && e.ctrlKey) {
+    // Ctrl+S: skip current session
+    e.preventDefault();
+    if (state.timerStatus === 'running' || state.timerStatus === 'finished') {
+      skipSession();
+    }
+  }
+});
+
+// Double-click timer to skip session
+dom.ringContainer.addEventListener('dblclick', () => {
+  if (state.timerStatus === 'running' || state.timerStatus === 'finished') {
+    skipSession();
+  }
+});
+
+// ============================================================
+// Initialization
+// ============================================================
+
+function init() {
+  // Load settings
+  state.settings = loadSettings();
+
+  // Apply theme
+  document.body.setAttribute('data-theme', state.settings.darkMode ? 'dark' : 'light');
+
+  // Set initial duration
+  state.totalDuration = state.settings.workDuration * 60;
+
+  // Load today's completed count
+  state.completedPomodoros = loadTodayPomodoros();
+
+  // Initial render
+  render();
+  updateStatus('开始专注 — 点击"开始"或按空格键');
+}
+
+init();
+</script>
+</body>
+</html>
